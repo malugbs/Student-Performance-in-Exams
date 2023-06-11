@@ -34,7 +34,7 @@ library(GGally)
 library(repr) 
 
 #reading the data
-df = read.csv("C:/Users/guima/Documents/r/Students Performance/StudentsPerformance.csv") 
+df = read.csv(".../Students Performance/StudentsPerformance.csv") 
 
 
 #adding a column for overall score and another column based on the student overall performance
