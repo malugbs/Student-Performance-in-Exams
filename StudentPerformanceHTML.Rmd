@@ -1,0 +1,473 @@
+---
+title: "Student Performance"
+
+output:
+  html_document:
+    theme: paper
+    toc: true
+    toc_depth: 2
+    df_print: paged
+    code_folding: hide
+
+date: "2023"
+---
+
+# Loading data
+
+In this first step, we are adding a column for overall score and another column based on the student overall performance.
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(tidyr)
+library(stargazer)
+library(tidyr)
+library(haven)
+library(dplyr)
+library(ggplot2)
+library(plm)
+library(devtools)
+library(plotly)
+library(ggcorrplot)
+library(RColorBrewer)
+library(GGally)
+library(repr) 
+
+#reading the data
+df = read.csv("C:/Users/guima/Documents/r/Students Performance/StudentsPerformance.csv") 
+
+
+#adding a column for overall score and another column based on the student overall performance
+df = df %>%
+  mutate(overall.score = (math.score + reading.score + writing.score)/3,
+         result = ifelse(overall.score >= 90, "Excelent", ifelse(overall.score>=80, "Very Good", 
+                                                                 ifelse(overall.score>=70, "Good", 
+                                                                        ifelse(overall.score>=60, "Average", 
+                                                                               ifelse(overall.score>=50, "Passable", "Fail"))))))
+```
+
+# Overall Analysis
+
+## Statistics
+
+Now, we can start annalysing the data. The first part of the annalysis corresponds to partial observations made mainly using summarise. These results are going to give us some insights for further annalysis.
+
+We can see that the observations are almost evenly distributed between men and women. Most students did not take the preparation course and most of them have standart lunch time; also, most student are a part of the race group C.
+
+```{r, echo=FALSE}
+df %>%
+  mutate(standart = ifelse(lunch == "standard", 1, 0),
+         prep = ifelse(test.preparation.course == "completed", 1, 0),
+         gen = ifelse(gender == "female", 1, 0)) %>%
+  summarise(percentage.standart = mean(standart)*100,
+          percentage.other = (100 - percentage.standart),
+          percentage.course = mean(prep)*100,
+          percentage.no.course = (100 - percentage.course),
+          percentage.female = mean(gen)*100,
+          percentage.male = (100 - percentage.female))
+
+df %>%
+  group_by(race.ethnicity) %>%
+  summarise(race.group = n()) %>% 
+  mutate(race.group.percentage =  100*race.group/sum(race.group)) %>% 
+  arrange(desc(race.group.percentage))
+```
+
+Here we can observe the same results obtained in the first summarise, but now divided by race group.
+
+```{r, echo=FALSE}
+df %>%
+    group_by(race.ethnicity) %>%
+    mutate(standart = ifelse(lunch == "standard", 1, 0),
+           prep = ifelse(test.preparation.course == "completed", 1, 0),
+           gen = ifelse(gender == "female", 1, 0)) %>%
+    summarise(percentage.standart = mean(standart)*100,
+              percentage.other = (100 - percentage.standart),
+              percentage.course = mean(prep)*100,
+              percentage.no.course = (100 - percentage.course),
+              percentage.female = mean(gen)*100,
+              percentage.male = (100 - percentage.female))
+```
+
+Most of the parents have at least some college experience. It also seems like better parent educational level is associated with better scores.
+
+```{r, echo=FALSE}
+df %>%
+  group_by(parental.level.of.education) %>%
+  summarise(parental.group = n()) %>% 
+  mutate(parental.group.percentage =  100*parental.group/sum(parental.group)) %>% 
+  arrange(desc(parental.group.percentage))
+
+df %>%
+  group_by(parental.level.of.education) %>%
+  mutate(gen = ifelse(gender == "female", 1, 0)) %>%
+  summarise(mean.score = mean(overall.score),
+            median.score = median(overall.score)) %>% 
+  arrange(desc(mean.score))
+
+df %>%
+  group_by(result) %>%
+  summarise(result.group = n()) %>% 
+  mutate(result.group.percentage =  100*result.group/sum(result.group)) %>% 
+  arrange(desc(result.group.percentage))
+```
+
+The students results were mostly good or average.
+
+Here, we start observing some interesting facts. First, it seems that there is a relation between having standart lunch and getting good results; the same applies to taking the preparation course. Also, in general, women seem to get better results than men.
+
+```{r,echo=FALSE}
+df %>%
+  group_by(result) %>%
+  mutate(standart = ifelse(lunch == "standard", 1, 0),
+         prep = ifelse(test.preparation.course == "completed", 1, 0),
+         gen = ifelse(gender == "female", 1, 0)) %>%
+  summarise(mean.score = mean(overall.score),
+            percentage.standart = mean(standart)*100,
+            percentage.other = (100 - percentage.standart),
+            percentage.course = mean(prep)*100,
+            percentage.no.course = (100 - percentage.course),
+            percentage.female = mean(gen)*100,
+            percentage.male = (100 - percentage.female)) %>% 
+  arrange(desc(mean.score))
+
+df %>%
+  group_by(race.ethnicity) %>%
+  mutate(gen = ifelse(gender == "female", 1, 0)) %>%
+  summarise(mean.score = mean(overall.score),
+            median.score = median(overall.score)) %>% 
+  arrange(desc(mean.score))
+
+df %>%
+  group_by(race.ethnicity) %>%
+  mutate(gen = ifelse(gender == "female", 1, 0)) %>%
+  summarise(mean.score = mean(overall.score),
+            median.score = median(overall.score),
+            mean.writing = mean(writing.score),
+            mean.reading = mean(reading.score),
+            mean.math = mean(math.score)) %>% 
+  arrange(desc(mean.score))
+```
+
+```{r cols.print=4, rows.print=30,echo=FALSE}
+df %>%
+  group_by(race.ethnicity, result) %>%
+  summarise(result.by.group = n()) %>% 
+  mutate(result.group.percentage = 100*result.by.group/sum(result.by.group)) %>% 
+  arrange(desc(result.group.percentage)) 
+```
+
+Group E has the greatest overall result average. When we observe the distribution by result and race group, it becomes clear why - over 50% of the observations have either good or very good results.
+
+## Graphical Analysis
+
+Having gotten these first statistics, when can now use some visual representation, as well as some other information
+
+Firstly, we can observe that women have better averages than men in all groups.
+
+```{r fig.height = 10, fig.width = 16, fig.align = "center",echo=FALSE}
+df %>%
+  group_by(gender, race.ethnicity) %>%
+  mutate(mean.score = mean(overall.score)) %>%
+  ggplot(aes(x = race.ethnicity, y = mean.score, fill = gender)) + 
+  geom_bar(position="dodge", stat="identity") + 
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Average scoring by race group and gender",
+       x = "Race Group", 
+       y = "Average Score", 
+       fill = "Gender") +
+  theme(legend.position = "bottom") +
+  theme_classic()
+
+df %>%
+  ggplot(aes(x = race.ethnicity, y = overall.score, fill = race.ethnicity)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "right") +
+  scale_fill_brewer(palette = "Pastel1") +
+  scale_y_continuous() +
+  labs(
+    title = "Median score by race group",
+    y = "Overall Score",
+    x = "",
+    fill = "") 
+
+
+Data_gather = df %>%
+  mutate(StudentID = row_number()) %>%
+  gather(key = "subject", value = "score", math.score:writing.score)
+
+ggplot(data=Data_gather, aes(x=Data_gather$race.ethnicity, y=Data_gather$score, 
+                             fill=Data_gather$race.ethnicity)) + 
+  geom_boxplot() + 
+  theme(
+    text = element_text(family = "Tahoma"),
+    axis.text.x = element_blank(),
+    legend.title = element_blank()
+  ) +
+  facet_grid(. ~ subject ) +
+  theme_classic() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(
+    title = "Median score by race group and test",
+    y = "Score",
+    x = "",
+    fill = "Race group")
+```
+
+As expected, group E has the best performance in all of the subjects, almost losing the spot to group D in the writing test. It is also interesting to note that group A and B seem to have the greater variance across the results, which may be one of the reasons why, overall, they rank last.
+
+Another interesting result comes when we annalyse student performance by gender and type of test. As noted before, women have better overall results than men. However when we sort these results by test, we can observe that, although women do better at writing and reading, men apparently are able to get better results in the math test. It is also interesting to nete that the negative outliers are apparently more concentrated in the women's observations.
+
+```{r fig.height = 10, fig.width = 16, fig.align = "center",echo=FALSE}
+Data_gather = df %>%
+  mutate(StudentID = row_number()) %>%
+  gather(key = "subject", value = "score", math.score:writing.score)
+
+ggplot(data=Data_gather, aes(x=gender, y=Data_gather$score, 
+                             fill=gender)) + 
+  geom_boxplot() + 
+  theme(
+    text = element_text(family = "Tahoma"),
+    axis.text.x = element_blank(),
+    legend.title = element_blank()
+  ) +
+  facet_grid(. ~ subject ) +
+  theme_classic() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(
+    title = "Median score by gender and test",
+    y = "Score",
+    x = "",
+    fill = "Gender")
+
+df %>%
+  ggplot(aes(x = race.ethnicity, y = overall.score, fill = gender)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "right") +
+  scale_fill_brewer(palette = "Pastel1") +
+  scale_y_continuous() +
+  labs(
+    title = "Median score by race group and gender",
+    y = "Overall Score",
+    x = "",
+    fill = "Gender")
+```
+
+Contributing to our assumption that parent's education is related to better results, we can observe that the higher educational levels are associated with slight better medians. It is relevant to note, however, that the biggest impact seems to be associated with parents who only completed high school, given that this group of students represent the lowest results. Other increases in the educational level represent, at first observation, only a slightly positive improvement in the students performance.
+
+```{r fig.height = 10, fig.width = 16, fig.align = "center",echo=FALSE}
+df %>%
+  ggplot(aes(x = parental.level.of.education, y = overall.score, fill = parental.level.of.education)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "right") +
+  scale_fill_brewer(palette = "Pastel1") +
+  scale_y_continuous() +
+  labs(
+    title = "Median score by parental level of education",
+    y = "Overall Score",
+    x = "",
+    fill = "Parent level of education")
+
+df %>%
+  ggplot(aes(x = test.preparation.course, y = overall.score, fill = race.ethnicity)) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "right") +
+  scale_fill_brewer(palette = "Pastel1") +
+  scale_y_continuous() +
+  labs(
+    title = "Median score by race group and test preparation",
+    y = "Overall Score",
+    x = "",
+    fill = "Race group")
+```
+
+Regardless of the race, the preparation course has a big impact on the student's results, although in some groups the is a bigger variation than in others.
+
+We can now see if there is any correlation between the results in each of the tests.
+
+First, it is clear that a good result in a subject directly influences a better result in other test. However, this relation is not so strong whe it comes to math. As we can see in the plot, the observations are slightly more spaced when it comes to the relationship between math and reading/writing in comparison to the relationship between reading and writing. This is not so surprising given that readin and writing are skills usually extremely correlated with one another.
+
+```{r fig.height = 10, fig.width = 16, fig.align = "center",echo=FALSE}
+df %>%
+  ggplot(aes(x=writing.score, y=math.score)) +
+  geom_point() +
+  ggtitle("Relationship between math score and writing score") +
+  geom_smooth(method=lm , color="red", fill="#F1F1A8", se=TRUE) +
+  theme_classic()
+
+df %>%
+  ggplot(aes(x=reading.score, y=math.score)) +
+  geom_point() +
+  ggtitle("Relationship between math score and reading score") +
+  geom_smooth(method=lm , color="red", fill="#F1F1A8", se=TRUE) +
+  theme_classic()
+
+df %>%
+  ggplot(aes(x=writing.score, y=reading.score)) +
+  geom_point() +
+  ggtitle("Relationship between reading score and writing score") +
+  geom_smooth(method=lm , color="red", fill="#F1F1A8", se=TRUE) +
+  theme_classic()
+```
+
+We can do the same, but now the correlation is between the subject and overall score.
+
+It is quite obvious (and expected) that there is posive correlation between subjet and overall performance - but once again, this correlation is not as strong when it comes to math. In order to give a more precise explanation as to why this happens, we would need more information on the students backgroung; we can, however, make some assumptions: 1. as observed before, math corresponds to the lowest averages between students; 2. it means that overall, the math result does not have quite the same impact as subjects in which the average result is better;
+
+```{r fig.height = 10, fig.width = 16, fig.align = "center",echo=FALSE}
+df %>%
+  ggplot(aes(x=overall.score, y=math.score)) +
+  geom_point() +
+  ggtitle("Relationship between math score and overall score") +
+  geom_smooth(method=lm , color="red", fill="#F1F1A8", se=TRUE) +
+  theme_classic()
+
+df %>%
+  ggplot(aes(x=overall.score, y=reading.score)) +
+  geom_point() +
+  ggtitle("Relationship between reading score and overall score") +
+  geom_smooth(method=lm , color="red", fill="#F1F1A8", se=TRUE) +
+  theme_classic()
+
+df %>%
+  ggplot(aes(y=reading.score, x=overall.score)) +
+  geom_point() +
+  ggtitle("Relationship between overall score and reading score") +
+  geom_smooth(method=lm , color="red", fill="#F1F1A8", se=TRUE) +
+  theme_classic()
+```
+
+In order to have a better visual of this relationships, we can plot a correlogram.
+
+```{r fig.height = 10, fig.width = 16, fig.align = "center",echo=FALSE}
+df[6:9] %>%
+  ggcorr(method = c("everything", "pearson"), low = "#FED9A6", mid = "#FBB4AE", high = "#F44B4B", label = TRUE, label_size = 4, label_color = "white")
+```
+
+As stated before, although there is high correlation between all the variables, the results are a little lower when it comes to math.
+
+📌 In order to try and provide a better correlation between parents educational level and students results, we can generate another column with **random years of education**, based on the already existing level. Note that, as this results are randomly generated, they might compromise the correlation a little - **these are just used as an example** to try and better test our assumptions, given that the dataset is limited.
+ 
+```{r fig.height = 10, fig.width = 16, fig.align = "center",echo=FALSE}
+df = df %>%
+  mutate(parents.educ = ifelse(parental.level.of.education == "some college", sample(19:24, size = nrow(df), replace = TRUE), 
+                               ifelse(parental.level.of.education == "bachelor's degree",25, ifelse(parental.level.of.education == "master's degree", 32,
+                                             ifelse(parental.level.of.education == "associate's degree", 23, ifelse(parental.level.of.education == "some high school", sample(16:18, size = nrow(df), replace = TRUE), 18))))))
+
+df[6:11] %>%
+  ggcorr(method = c("everything", "pearson"), low = "#FED9A6", mid = "#FBB4AE", high = "#F44B4B", label = TRUE, label_size = 4, label_color = "white")
+```
+
+As expected, the years of parent's education do have a positive - but really small - correlation with the student's performances. This might be explained because the biggest impact in the results is related to the gap between parents with some high school vs. parents who finished high school; we can assume, then, that the marginal effect of one more year of education after that is quite small; also, given that only 17.8% of the parents did not actually finish HS, this percentage does not hold a significative impact on the observations of this dataset.
+
+However, once again, this is based on randomly generated years of education. Although we tried to make it somewhat realistic based on educational level, they may not actually represent reality.
+
+# Regressions
+
+Now, for this last part of the annalysis, we can try to create a linear model.
+
+But first, let's create some dummies a log() the scores.
+
+```{r, echo=FALSE}
+df = df %>%
+  mutate(log.overall = log(overall.score),
+         log.math = log(math.score),
+         log.writing = log(writing.score),
+         log.reading = log(reading.score),
+         gender.dummy = ifelse(gender == "male", 1, 0),
+         lunch.dummy = ifelse(lunch == "standard", 0, 1),
+         prep.dummy = ifelse(test.preparation.course == "none", 1, 0)) %>%
+  filter(!log.math == "-Inf")
+```
+
+We can make a new correlogram adding the new variables we created.
+
+The correlation between scores remains practically the same. As we can see, not having the standart lunch time and not taking the preparation course have a negative impact on the overall score (not as negative as I would've expected!).
+
+The most interesting results, in my opinion, are related to the gender dummies. They imply that men have worse results in almost all tests but math. This is nothing new, as we have gotten to this conclusion already, based on previous statistics.
+
+This results are going to be important, however, for the next regressions we are going to run.
+
+```{r fig.height = 10, fig.width = 16, fig.align = "center",echo=FALSE}
+df[12:18] %>%
+  ggcorr(method = c("everything", "pearson"), low = "#FED9A6", mid = "#FBB4AE", high = "#F44B4B", label = TRUE, label_size = 4, label_color = "white")
+```
+
+  
+  
+The first model is very simple consists only on the subject's tests results and their impacts on the overall score.
+  
+  
+```{r message=FALSE, results='asis', align = "center", echo=FALSE}
+reg1 = lm(log.overall ~ math.score + writing.score + reading.score, df)
+stargazer(reg1, type = "html", title = "Simple regression models", align=TRUE)
+```
+  
+  
+
+In the second and third models, we added the dummies we created and the variable corresponding to the parent's years of education.
+  
+  
+```{r message=FALSE, results='asis', align = "center", echo=FALSE}
+reg2 = lm(log.overall ~ math.score + writing.score + reading.score + gender.dummy + lunch.dummy + prep.dummy, df)
+stargazer(reg2, type = "html", title = "Simple regression models", align=TRUE)
+
+reg3 = lm(log.overall ~ math.score + writing.score + reading.score + gender.dummy + lunch.dummy + prep.dummy + parents.educ, df)
+stargazer(reg3, type = "html", title = "Simple regression models", align=TRUE)
+```
+
+  
+  
+We can now compare the results
+  
+  
+```{r message=FALSE, results='asis', , echo=FALSE}
+stargazer(reg1, reg2, reg3, type = "html", title = "Simple regression models", align=TRUE)
+```
+
+  
+  
+The first thing we can notice is that the lunch dummy and parents.educ variable do not have any statistical relevance.
+  
+  
+There are also some results that don't seem to make sense given our first analysis. The gender.dummy, for example, indicates that, ceteris paribus, men get overall scores 1.5% higher then women; the prep.dummy indicates that students who don't take preparation courses tend to get 0.6% higher overall scores.
+
+```{r message=FALSE, results='asis', align = "center", echo=FALSE}
+regdummy = lm(log.overall ~ gender.dummy + lunch.dummy + prep.dummy + parents.educ, df)
+stargazer(regdummy, type = "html", title = "Simple regression models", align=TRUE)
+```
+
+  
+  
+Now, notice that when we ignore the subject's scores and only regress the other variables, the results are actually quite consistent to what we what we expected. The problem is that now the R² is really low, meaning these variables alone do not explain much of the overall result.
+  
+  
+Another thing we can do is regress the variables in relation to the specific tests.  
+
+
+```{r message=FALSE, results='asis', align = "center", echo=FALSE}
+reg11 = lm(log.math ~ writing.score + reading.score + gender.dummy + lunch.dummy + prep.dummy + parents.educ, df)
+
+reg22 = lm(log.writing ~ math.score + reading.score + gender.dummy + lunch.dummy + prep.dummy + parents.educ, df)
+
+reg33 = lm(log.reading ~ math.score + writing.score + gender.dummy + lunch.dummy + prep.dummy + parents.educ, df)
+
+stargazer(reg11, reg22, reg33, type = "html", title = "Simple regression models", align=TRUE)
+```
+  
+  
+Note that now, the result are actually more consistent with the observation we made - the gender dummy indicates that men are more likely to do better at math, but get get worse scores in writing.
+  
+  
+The other dummies have different impact depending on the depending variable.
+  
+  
+📌 Although this model is interesting, it is also quite simple, which might cause some problems in our conclusions. One other thing we could add is an **IV regression**: 1. we colud use the parent's education as an IV to subject score; 2. or use score result in one subject as an IV for other subject, as we've seem there is a high correlation between these variables.
